@@ -1,0 +1,24 @@
+Java build artifacts
+
+/target/
+*.jar
+*.class
+*.log
+
+IDE files
+
+.idea/
+.vscode/
+*.iml
+*.iws
+*.ipr
+
+macOS
+
+.DS_Store
+
+=== SECURITY ===
+
+Never commit local properties files
+
+/src/main/resources/application-local.properties

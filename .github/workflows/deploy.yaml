@@ -1,0 +1,58 @@
+name: Build and Deploy EOD Bot
+
+on:
+  push:
+    branches: [ main ] # Trigger on push to main branch
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout Code
+      uses: actions/checkout@v3
+
+    - name: Set up JDK 17
+      uses: actions/setup-java@v3
+      with:
+        java-version: '17'
+        distribution: 'temurin'
+
+    - name: Build with Maven
+      # This builds the self-contained .jar file
+      run: mvn -B package --file pom.xml
+
+    - name: Copy JAR to Server
+      # Uses SCP to copy the built .jar to your server
+      uses: appleboy/scp-action@master
+      with:
+        host: ${{ secrets.SERVER_HOST }}
+        username: ${{ secrets.SERVER_USERNAME }}
+        key: ${{ secrets.SERVER_SSH_KEY }}
+        source: "target/eod-bot-0.0.1-SNAPSHOT.jar" # Adjust if version/name differs
+        target: "/home/mybot" # A directory on your server
+
+    - name: Run the Bot on Server
+      # Logs into your server via SSH and runs the app
+      uses: appleboy/ssh-action@master
+      with:
+        host: ${{ secrets.SERVER_HOST }}
+        username: ${{ secrets.SERVER_USERNAME }}
+        key: ${{ secrets.SERVER_SSH_KEY }}
+        
+        script: |
+          # 1. Stop the old bot (if it's running)
+          killall java || true
+          
+          # 2. Set environment variables from GitHub Secrets for PROD
+          export TELEGRAM_BOT_TOKEN=${{ secrets.TELEGRAM_BOT_TOKEN }}
+          export TELEGRAM_BOT_USERNAME=${{ secrets.TELEGRAM_BOT_USERNAME }}
+          export SPRING_DATASOURCE_URL=${{ secrets.PROD_DB_URL }}
+          export SPRING_DATASOURCE_USERNAME=${{ secrets.PROD_DB_USER }}
+          export SPRING_DATASOURCE_PASSWORD=${{ secrets.PROD_DB_PASS }}
+          export SPRING_JPA_HIBERNATE_DDL_AUTO=update
+          
+          # 3. Start the new bot in the background
+          cd /home/mybot
+          nohup java -jar eod-bot-0.0.1-SNAPSHOT.jar > bot.log 2>&1 &
+
